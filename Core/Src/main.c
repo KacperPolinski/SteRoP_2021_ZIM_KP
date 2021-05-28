@@ -24,7 +24,6 @@
 /* USER CODE BEGIN Includes */
 #include "math.h"
 #include "stdlib.h"
-#include "stdbool.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -76,7 +75,17 @@ static void MX_I2C3_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+volatile float pfData[3];
 
+static uint16_t wave_table_dbuff[BUFF_SIZ]; // podwojny bufor
+static float current_arg;
+static const float dt = 1/SAMP_FREQ_F;
+
+static float current_freq = 500;
+static float goal_freq = 500;
+int volume = 2047;
+
+static const float step_freq = 5;
 
 int _write(int file, char *ptr, int len)
 {
@@ -140,7 +149,6 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
 
   }
   /* USER CODE END 3 */
@@ -437,10 +445,67 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
     HAL_UART_Receive_IT(&huart1, rx_str, 1);
 
-
+    float dv = (atoi(rx_str)-5)*409;
+    volume = 2047 + dv;
 }
 
+void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef *hdac)
+{
+  /* Prevent unused argument(s) compilation warning */
+  UNUSED(hdac);
 
+  BSP_GYRO_GetXYZ(pfData);
+  int16_t pfData_16[3];
+  for(int i = 0; i < 3; ++i)
+  {
+  		  pfData_16[i] = (int16_t)pfData[i];
+  }
+  float freq = 1000*pfData_16[0]/32767;
+  goal_freq = 1000.0f + freq;
+
+  current_freq += (current_freq > goal_freq) ? -step_freq : +step_freq;
+
+  float delta_arg = 2*M_PI*current_freq*dt;
+
+  current_arg = fmod(current_arg, 2*M_PI); // sinf(duze warttosci kata) generuje duzy blad
+
+  // zapelnianie drugiej czesci tablicy
+
+  for(size_t i = BUFF_SIZ/2; i<BUFF_SIZ; i++)
+  {
+	  current_arg += delta_arg;
+
+	  wave_table_dbuff[i] = (sinf(current_arg)/2+0.5)*volume;
+  }
+}
+
+void HAL_DAC_ConvHalfCpltCallbackCh1(DAC_HandleTypeDef *hdac)
+{
+  /* Prevent unused argument(s) compilation warning */
+  UNUSED(hdac);
+  BSP_GYRO_GetXYZ(pfData);
+  int16_t pfData_16[3];
+  for(int i = 0; i < 3; ++i)
+  	  {
+  		  pfData_16[i] = (int16_t)pfData[i];
+  	  }
+  float freq = 1000*pfData_16[0]/32767;
+
+  goal_freq = 1000.0f + freq;
+  current_freq += (current_freq > goal_freq) ? -step_freq : +step_freq;
+
+  float delta_arg = 2*M_PI*current_freq*dt;
+
+  current_arg = fmod(current_arg, 2*M_PI); // sinf(duze warttosci kata) generuje duzy blad
+
+  // zapelnianie drugiej czesci tablicy
+  for(size_t i = 0; i<BUFF_SIZ/2; i++)
+  {
+	  current_arg += delta_arg;
+
+	  wave_table_dbuff[i] = (sinf(current_arg)/2+0.5)*volume;
+  }
+}
 /* USER CODE END 4 */
 
 /**
