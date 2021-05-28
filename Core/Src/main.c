@@ -97,6 +97,32 @@ int _write(int file, char *ptr, int len)
 	return len;
 }
 
+void process_buffor(size_t start_index, size_t end_index)
+{
+	BSP_GYRO_GetXYZ(pfData);
+	int16_t pfData_16[3];
+	for(int i = 0; i < 3; ++i)
+	  {
+		  pfData_16[i] = (int16_t)pfData[i];
+	  }
+	float freq = 1000*pfData_16[0]/32767;
+
+	goal_freq = 1000.0f + freq;
+	current_freq += (current_freq > goal_freq) ? -step_freq : +step_freq;
+
+	float delta_arg = 2*M_PI*current_freq*dt;
+
+	current_arg = fmod(current_arg, 2*M_PI); // sinf(duze warttosci kata) generuje duzy blad
+
+	// zapelnianie drugiej czesci tablicy
+	for(size_t i = start_index; i<end_index; i++)
+	{
+	  current_arg += delta_arg;
+
+	  wave_table_dbuff[i] = (sinf(current_arg)/2+0.5)*volume;
+	}
+}
+
 uint8_t rx_str[2];
 
 /* USER CODE END 0 */
@@ -157,56 +183,13 @@ int main(void)
 	{
 		is_ping_active = false;
 		//
-		BSP_GYRO_GetXYZ(pfData);
-		int16_t pfData_16[3];
-		for(int i = 0; i < 3; ++i)
-		  {
-			  pfData_16[i] = (int16_t)pfData[i];
-		  }
-		float freq = 1000*pfData_16[0]/32767;
-
-		goal_freq = 1000.0f + freq;
-		current_freq += (current_freq > goal_freq) ? -step_freq : +step_freq;
-
-		float delta_arg = 2*M_PI*current_freq*dt;
-
-		current_arg = fmod(current_arg, 2*M_PI); // sinf(duze warttosci kata) generuje duzy blad
-
-		// zapelnianie drugiej czesci tablicy
-		for(size_t i = 0; i<BUFF_SIZ/2; i++)
-		{
-		  current_arg += delta_arg;
-
-		  wave_table_dbuff[i] = (sinf(current_arg)/2+0.5)*volume;
-		}
+		process_buffor(0, BUFF_SIZ/2);
 	}
 	else if(is_pong_active)
 	{
 		is_pong_active = false;
 
-		BSP_GYRO_GetXYZ(pfData);
-		int16_t pfData_16[3];
-		for(int i = 0; i < 3; ++i)
-		{
-			  pfData_16[i] = (int16_t)pfData[i];
-		}
-		float freq = 1000*pfData_16[0]/32767;
-		goal_freq = 1000.0f + freq;
-
-		current_freq += (current_freq > goal_freq) ? -step_freq : +step_freq;
-
-		float delta_arg = 2*M_PI*current_freq*dt;
-
-		current_arg = fmod(current_arg, 2*M_PI); // sinf(duze warttosci kata) generuje duzy blad
-
-		// zapelnianie drugiej czesci tablicy
-
-		for(size_t i = BUFF_SIZ/2; i<BUFF_SIZ; i++)
-		{
-		  current_arg += delta_arg;
-
-		  wave_table_dbuff[i] = (sinf(current_arg)/2+0.5)*volume;
-		}
+		process_buffor(BUFF_SIZ/2, BUFF_SIZ);
 	}
 
   }
