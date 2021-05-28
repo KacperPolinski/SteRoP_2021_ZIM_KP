@@ -24,6 +24,7 @@
 /* USER CODE BEGIN Includes */
 #include "math.h"
 #include "stdlib.h"
+#include "stdbool.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -74,6 +75,9 @@ static void MX_I2C3_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+bool is_ping_active = false;
+bool is_pong_active = false;
 
 volatile float pfData[3];
 
@@ -149,6 +153,61 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	if(is_ping_active)
+	{
+		is_ping_active = false;
+		//
+		BSP_GYRO_GetXYZ(pfData);
+		int16_t pfData_16[3];
+		for(int i = 0; i < 3; ++i)
+		  {
+			  pfData_16[i] = (int16_t)pfData[i];
+		  }
+		float freq = 1000*pfData_16[0]/32767;
+
+		goal_freq = 1000.0f + freq;
+		current_freq += (current_freq > goal_freq) ? -step_freq : +step_freq;
+
+		float delta_arg = 2*M_PI*current_freq*dt;
+
+		current_arg = fmod(current_arg, 2*M_PI); // sinf(duze warttosci kata) generuje duzy blad
+
+		// zapelnianie drugiej czesci tablicy
+		for(size_t i = 0; i<BUFF_SIZ/2; i++)
+		{
+		  current_arg += delta_arg;
+
+		  wave_table_dbuff[i] = (sinf(current_arg)/2+0.5)*volume;
+		}
+	}
+	else if(is_pong_active)
+	{
+		is_pong_active = false;
+
+		BSP_GYRO_GetXYZ(pfData);
+		int16_t pfData_16[3];
+		for(int i = 0; i < 3; ++i)
+		{
+			  pfData_16[i] = (int16_t)pfData[i];
+		}
+		float freq = 1000*pfData_16[0]/32767;
+		goal_freq = 1000.0f + freq;
+
+		current_freq += (current_freq > goal_freq) ? -step_freq : +step_freq;
+
+		float delta_arg = 2*M_PI*current_freq*dt;
+
+		current_arg = fmod(current_arg, 2*M_PI); // sinf(duze warttosci kata) generuje duzy blad
+
+		// zapelnianie drugiej czesci tablicy
+
+		for(size_t i = BUFF_SIZ/2; i<BUFF_SIZ; i++)
+		{
+		  current_arg += delta_arg;
+
+		  wave_table_dbuff[i] = (sinf(current_arg)/2+0.5)*volume;
+		}
+	}
 
   }
   /* USER CODE END 3 */
@@ -453,58 +512,15 @@ void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef *hdac)
 {
   /* Prevent unused argument(s) compilation warning */
   UNUSED(hdac);
+  is_pong_active = true;
 
-  BSP_GYRO_GetXYZ(pfData);
-  int16_t pfData_16[3];
-  for(int i = 0; i < 3; ++i)
-  {
-  		  pfData_16[i] = (int16_t)pfData[i];
-  }
-  float freq = 1000*pfData_16[0]/32767;
-  goal_freq = 1000.0f + freq;
-
-  current_freq += (current_freq > goal_freq) ? -step_freq : +step_freq;
-
-  float delta_arg = 2*M_PI*current_freq*dt;
-
-  current_arg = fmod(current_arg, 2*M_PI); // sinf(duze warttosci kata) generuje duzy blad
-
-  // zapelnianie drugiej czesci tablicy
-
-  for(size_t i = BUFF_SIZ/2; i<BUFF_SIZ; i++)
-  {
-	  current_arg += delta_arg;
-
-	  wave_table_dbuff[i] = (sinf(current_arg)/2+0.5)*volume;
-  }
 }
 
 void HAL_DAC_ConvHalfCpltCallbackCh1(DAC_HandleTypeDef *hdac)
 {
   /* Prevent unused argument(s) compilation warning */
   UNUSED(hdac);
-  BSP_GYRO_GetXYZ(pfData);
-  int16_t pfData_16[3];
-  for(int i = 0; i < 3; ++i)
-  	  {
-  		  pfData_16[i] = (int16_t)pfData[i];
-  	  }
-  float freq = 1000*pfData_16[0]/32767;
-
-  goal_freq = 1000.0f + freq;
-  current_freq += (current_freq > goal_freq) ? -step_freq : +step_freq;
-
-  float delta_arg = 2*M_PI*current_freq*dt;
-
-  current_arg = fmod(current_arg, 2*M_PI); // sinf(duze warttosci kata) generuje duzy blad
-
-  // zapelnianie drugiej czesci tablicy
-  for(size_t i = 0; i<BUFF_SIZ/2; i++)
-  {
-	  current_arg += delta_arg;
-
-	  wave_table_dbuff[i] = (sinf(current_arg)/2+0.5)*volume;
-  }
+  is_ping_active = true;
 }
 /* USER CODE END 4 */
 
